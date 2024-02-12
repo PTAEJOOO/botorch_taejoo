@@ -429,7 +429,7 @@ class LatentModel(nn.Module):
         return kl_loss
 
 
-def get_fitted_model(dataset_train, dataset_test, state_dict=None, optim=None):
+def get_fitted_model_anp(dataset_train, dataset_test, state_dict=None, optim=None):
     # initialize and fit model
     model = LatentModel(1, 1, 64, latent_enc_self_attn_type="multihead", det_enc_self_attn_type="multihead",
                    det_enc_cross_attn_type="multihead")
