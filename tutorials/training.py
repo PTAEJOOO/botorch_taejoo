@@ -85,6 +85,9 @@ class NeuralProcessTrainer():
                     _, y_target = img_mask_to_np_input(img, target_mask)
                 else:
                     x, y = data
+                    # if
+                    x = x.unsqueeze(0)
+                    y = y.unsqueeze(0)
                     x_context, y_context, x_target, y_target = \
                         context_target_split(x, y, num_context, num_extra_target)
                     p_y_pred, q_target, q_context = \
