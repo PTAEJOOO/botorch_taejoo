@@ -5,8 +5,7 @@ from torch.distributions import Normal
 from utils import img_mask_to_np_input
 from botorch.posteriors.deterministic import DeterministicPosterior
 
-##
-
+#
 import itertools
 import warnings
 from abc import ABC
@@ -15,12 +14,6 @@ from typing import Any, List, Optional, Tuple, TYPE_CHECKING, Union
 
 import torch
 from botorch.acquisition.objective import PosteriorTransform
-from botorch.exceptions.errors import BotorchTensorDimensionError, InputDataError
-from botorch.exceptions.warnings import (
-    _get_single_precision_warning,
-    BotorchTensorDimensionWarning,
-)
-from botorch.models.model import Model, ModelList
 from botorch.models.utils import (
     _make_X_full,
     add_output_dim,
@@ -28,10 +21,14 @@ from botorch.models.utils import (
     mod_batch_shape,
     multioutput_to_batch_mode_transform,
 )
+from gpytorch.distributions import MultitaskMultivariateNormal, MultivariateNormal
+from gpytorch.likelihoods.gaussian_likelihood import FixedNoiseGaussianLikelihood
 from torch import Tensor
 
 from botorch.posteriors.transformed import TransformedPosterior  # pragma: no cover
 
+from botorch.posteriors.torch import TorchPosterior
+from botorch.posteriors.gpytorch import GPyTorchPosterior
 
 class NeuralProcess(nn.Module):
     """
@@ -68,6 +65,12 @@ class NeuralProcess(nn.Module):
         self.xz_to_y = Decoder(x_dim, z_dim, h_dim, y_dim)
 
         self._num_outputs = 1
+
+        ##
+        self.mu_context = None
+        self.sigma_context = None
+        self.q_context = None
+        self.z_sample = None
 
     def aggregate(self, r_i):
         """
@@ -168,59 +171,26 @@ class NeuralProcess(nn.Module):
         r"""The number of outputs of the model."""
         return self._num_outputs
     
-    def posterior(
-        self,
-        X: Tensor,
-        observation_noise: Union[bool, Tensor] = False,
-        posterior_transform: Optional[PosteriorTransform] = None,
-        **kwargs: Any,
-    ) -> Union[DeterministicPosterior, TransformedPosterior]:
-        r"""Computes the posterior over model outputs at the provided points.
+    def set_context_for_posterior(self, x_context, y_context):
+        # At testing time, encode only context
+        self.mu_context, self.sigma_context = self.xy_to_mu_sigma(x_context, y_context)
+        # Sample from distribution based on context
+        self.q_context = Normal(self.mu_context, self.sigma_context)
+        self.z_sample = self.q_context.rsample()
 
-        Args:
-            X: A `(batch_shape) x q x d`-dim Tensor, where `d` is the dimension
-                of the feature space and `q` is the number of points considered
-                jointly.
-            observation_noise: If True, add the observation noise from the
-                likelihood to the posterior. If a Tensor, use it directly as the
-                observation noise (must be of shape `(batch_shape) x q`). It is
-                assumed to be in the outcome-transformed space if an outcome
-                transform is used.
-            posterior_transform: An optional PosteriorTransform.
-
-        Returns:
-            A `GPyTorchPosterior` object, representing a batch of `b` joint
-            distributions over `q` points. Includes observation noise if
-            specified.
-        """
-        self.eval()  # make sure model is in eval mode
-        # input transforms are applied at `posterior` in `eval` mode, and at
-        # `model.forward()` at the training time
-        X = self.transform_inputs(X)
-        with gpt_posterior_settings():
-            # NOTE: BoTorch's GPyTorchModels also inherit from GPyTorch's ExactGP, thus
-            # self(X) calls GPyTorch's ExactGP's __call__, which computes the posterior,
-            # rather than e.g. SingleTaskGP's forward, which computes the prior.
-            mvn = self(X)
-            if observation_noise is not False:
-                if isinstance(observation_noise, torch.Tensor):
-                    # TODO: Make sure observation noise is transformed correctly
-                    self._validate_tensor_args(X=X, Y=observation_noise)
-                    if observation_noise.size(-1) == 1:
-                        observation_noise = observation_noise.squeeze(-1)
-                    mvn = self.likelihood(mvn, X, noise=observation_noise)
-                else:
-                    mvn = self.likelihood(mvn, X)
-        posterior = DeterministicPosterior(distribution=mvn)
-        if hasattr(self, "outcome_transform"):
-            posterior = self.outcome_transform.untransform_posterior(posterior)
-        if posterior_transform is not None:
-            return posterior_transform(posterior)
+    def posterior(self, X, posterior_transform=None):
+        # # At testing time, encode only context
+        # mu_context, sigma_context = self.xy_to_mu_sigma(x_context, y_context)
+        # # Sample from distribution based on context
+        # q_context = Normal(mu_context, sigma_context)
+        # z_sample = q_context.rsample()
+        # Predict target points based on context
+        y_pred_mu, y_pred_sigma = self.xz_to_y(X, self.z_sample)
+        p_y_pred = Normal(y_pred_mu, y_pred_sigma)
+        posterior = TorchPosterior(p_y_pred)
+        # p_y_pred = MultivariateNormal(y_pred_mu, y_pred_sigma)
+        # posterior = GPyTorchPosterior(p_y_pred)
         return posterior
-    
-    # def posterior(self):
-        
-    #     return EnsemblePosterior
 
 
 class NeuralProcessImg(nn.Module):

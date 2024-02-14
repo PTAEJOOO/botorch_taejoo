@@ -27,6 +27,10 @@ def context_target_split(x, y, num_context, num_extra_target):
     locations = np.random.choice(num_points,
                                  size=num_context + num_extra_target,
                                  replace=False)
+    if x.dim() < 3:
+        x = x.unsqueeze(0)
+    if y.dim() < 3:
+        y = y.unsqueeze(0)
     x_context = x[:, locations[:num_context], :]
     y_context = y[:, locations[:num_context], :]
     x_target = x[:, locations, :]

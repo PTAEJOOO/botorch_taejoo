@@ -101,7 +101,7 @@ class NeuralProcessTrainer():
                 if self.steps % self.print_freq == 0:
                     print("iteration {}, loss {:.3f}".format(self.steps, loss.item()))
 
-            print("Epoch: {}, Avg_loss: {}".format(epoch, epoch_loss / len(data_loader)))
+            # print("Epoch: {}, Avg_loss: {}".format(epoch, epoch_loss / len(data_loader)))
             self.epoch_loss_history.append(epoch_loss / len(data_loader))
 
     def _loss(self, p_y_pred, y_target, q_target, q_context):
