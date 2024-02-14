@@ -137,10 +137,12 @@ class Decoder(nn.Module):
         """
         batch_size, num_points, _ = x.size()
         # Repeat z, so it can be concatenated with every x. This changes shape
-        # from (batch_size, z_dim) to (batcsh_size, num_points, z_dim)
-        z = z.repeat(batch_size, 1)
-        a,b = z.size()
+        z = z.repeat(batch_size, 1) # 어차피 content based로 만들어지는 거라서 repeat으로 확장해도 될듯.
+
+        # a,b = z.size()
         # assert z.size() == torch.Size([batch_size, 50]), f"from x got batch size = {batch_size}, num_points = {num_points} ,from z got batch size = {a}, z latent dim = {b}"
+        
+        # from (batch_size, z_dim) to (batcsh_size, num_points, z_dim)
         z = z.unsqueeze(1).repeat(1, num_points, 1)
         # Flatten x and z to fit with linear layer
         x_flat = x.view(batch_size * num_points, self.x_dim)
