@@ -30,6 +30,9 @@ from botorch.posteriors.transformed import TransformedPosterior  # pragma: no co
 from botorch.posteriors.torch import TorchPosterior
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 
+from gpytorch.kernels import ScaleKernel
+from gpytorch.kernels import RBFKernel
+
 class NeuralProcess(nn.Module):
     """
     Implements Neural Process for functions of arbitrary dimensions.
@@ -71,6 +74,7 @@ class NeuralProcess(nn.Module):
         self.sigma_context = None
         self.q_context = None
         self.z_sample = None
+
 
     def aggregate(self, r_i):
         """
