@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+import gpytorch
 
 class Encoder(nn.Module):
     """Maps an (x_i, y_i) pair to a representation r_i.
@@ -70,7 +71,7 @@ class MuSigmaEncoder(nn.Module):
         self.r_to_hidden = nn.Linear(r_dim, r_dim)
         self.hidden_to_mu = nn.Linear(r_dim, z_dim)
         self.hidden_to_sigma = nn.Linear(r_dim, z_dim)
-
+        
     def forward(self, r):
         """
         r : torch.Tensor
@@ -122,6 +123,9 @@ class Decoder(nn.Module):
         self.hidden_to_mu = nn.Linear(h_dim, y_dim)
         self.hidden_to_sigma = nn.Linear(h_dim, y_dim)
 
+        # self.batch_size = 0
+        # self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(batch_shape=torch.Size([1])))
+
     def forward(self, x, z):
         """
         x : torch.Tensor
@@ -158,4 +162,8 @@ class Decoder(nn.Module):
         # Define sigma following convention in "Empirical Evaluation of Neural
         # Process Objectives" and "Attentive Neural Processes"
         sigma = 0.1 + 0.9 * F.softplus(pre_sigma)
+
+        # covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(batch_shape=torch.Size([batch_size])))
+        # sigma = covar_module(sigma)
+
         return mu, sigma
